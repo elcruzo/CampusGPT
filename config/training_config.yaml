@@ -1,0 +1,146 @@
+# CampusGPT Training Configuration
+
+# Model Configuration
+model:
+  base_model: "meta-llama/Llama-2-7b-chat-hf"
+  model_max_length: 2048
+  cache_dir: "./models/cache"
+  torch_dtype: "float16"
+  load_in_4bit: true
+  device_map: "auto"
+
+# Dataset Configuration
+data:
+  train_file: "data/processed/campus_train.jsonl"
+  validation_file: "data/processed/campus_val.jsonl"
+  test_file: "data/processed/campus_test.jsonl"
+  max_seq_length: 512
+  template_name: "alpaca"  # alpaca, chatml, vicuna
+  
+  # Data preprocessing
+  remove_duplicates: true
+  min_length: 10
+  max_length: 2048
+  validation_split: 0.1
+  test_split: 0.1
+
+# LoRA Configuration
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.1
+  bias: "none"
+  task_type: "CAUSAL_LM"
+  target_modules:
+    - "q_proj"
+    - "v_proj" 
+    - "k_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+# QLoRA Configuration (4-bit quantization)
+bnb_config:
+  load_in_4bit: true
+  bnb_4bit_use_double_quant: true
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_compute_dtype: "float16"
+
+# Training Arguments
+training:
+  output_dir: "./models/campusgpt-checkpoints"
+  num_train_epochs: 3
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 4
+  gradient_checkpointing: true
+  
+  # Optimization
+  learning_rate: 2.0e-4
+  weight_decay: 0.001
+  warmup_ratio: 0.03
+  lr_scheduler_type: "cosine"
+  
+  # Evaluation and Saving
+  evaluation_strategy: "steps"
+  eval_steps: 250
+  save_strategy: "steps"
+  save_steps: 500
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+  greater_is_better: false
+  
+  # Logging
+  logging_dir: "./logs"
+  logging_strategy: "steps"
+  logging_steps: 10
+  report_to: ["wandb", "tensorboard"]
+  
+  # Performance
+  fp16: true
+  dataloader_num_workers: 4
+  remove_unused_columns: false
+  label_names: ["labels"]
+  
+  # Early stopping
+  early_stopping_patience: 3
+  early_stopping_threshold: 0.001
+
+# Generation Configuration (for evaluation)
+generation:
+  max_new_tokens: 256
+  temperature: 0.7
+  top_p: 0.9
+  top_k: 50
+  do_sample: true
+  repetition_penalty: 1.1
+  pad_token_id: 2
+  eos_token_id: 2
+
+# Evaluation Configuration
+evaluation:
+  batch_size: 8
+  metrics:
+    - "bleu"
+    - "rouge"
+    - "perplexity"
+    - "similarity"
+  
+  # Custom metrics
+  category_eval: true
+  fact_checking: true
+  response_quality: true
+
+# Wandb Configuration
+wandb:
+  project: "campusgpt"
+  entity: null  # Your wandb username/org
+  name: null    # Will be auto-generated
+  tags:
+    - "llama2"
+    - "lora"
+    - "campus"
+    - "fine-tuning"
+  notes: "Fine-tuning LLaMA 2 for campus-specific queries"
+
+# DeepSpeed Configuration (for multi-GPU training)
+deepspeed:
+  enable: false
+  config_file: "config/deepspeed_config.json"
+  
+# Checkpointing
+checkpointing:
+  resume_from_checkpoint: null
+  save_safetensors: true
+  push_to_hub: false
+  hub_model_id: null
+  hub_token: null
+
+# System Configuration
+system:
+  seed: 42
+  cuda_visible_devices: "0"
+  mixed_precision: "fp16"
+  find_unused_parameters: false

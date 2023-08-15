@@ -1,0 +1,68 @@
+# CampusGPT Inference Configuration
+
+# Model Configuration
+model:
+  model_path: "./models/campusgpt-v1"
+  device: "cuda"  # cuda, cpu, auto
+  torch_dtype: "float16"  # float32, float16, bfloat16
+  load_in_8bit: false
+  trust_remote_code: true
+  device_map: "auto"
+
+# Generation Configuration
+generation:
+  max_length: 512
+  max_new_tokens: 256
+  temperature: 0.7
+  top_p: 0.9
+  top_k: 50
+  do_sample: true
+  repetition_penalty: 1.1
+  pad_token_id: 2
+  eos_token_id: 2
+  num_return_sequences: 1
+
+# Data Processing
+data:
+  max_seq_length: 512
+  template_name: "alpaca"  # alpaca, chatml, vicuna
+
+# Caching Configuration
+caching:
+  enabled: true
+  max_size: 1000
+  ttl: 3600  # 1 hour
+  type: "memory"  # memory, disk
+
+# API Server Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  timeout: 30
+  cors_origins: ["*"]
+  
+# Performance Optimization
+optimization:
+  batch_size: 1
+  enable_optimization: false
+  quantization: false
+  
+# Logging Configuration
+logging:
+  level: "INFO"
+  log_file: "./logs/inference.log"
+  max_log_size: "10MB"
+  backup_count: 5
+
+# Monitoring
+monitoring:
+  enable_metrics: true
+  metrics_port: 8001
+  health_check_interval: 30
+
+# Security
+security:
+  rate_limit: 100  # requests per minute
+  max_request_size: "1MB"
+  allowed_ips: []  # empty means all IPs allowed
