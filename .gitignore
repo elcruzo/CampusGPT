@@ -1,0 +1,137 @@
+# CampusGPT specific .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# CampusGPT specific
+logs/
+*.log
+wandb/
+.wandb/
+
+# Model files and checkpoints
+models/
+checkpoints/
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+model_cache/
+
+# Training data (potentially sensitive)
+data/raw/
+data/processed/
+data/private/
+*.jsonl
+*.json
+*.csv
+*.parquet
+
+# HuggingFace cache
+.cache/
+transformers_cache/
+~/.cache/huggingface/
+
+# Training artifacts
+runs/
+tensorboard_logs/
+training_logs/
+eval_results/
+predictions/
+
+# Evaluation outputs
+results/
+reports/
+evaluation/
+
+# Docker volumes
+docker/postgres_data/
+docker/redis_data/
+
+# Configuration with secrets
+config/secrets.yaml
+config/hf_token.txt
+.env.local
+.env.production
+
+# GPU monitoring
+nvidia_logs/
+
+# Test artifacts
+test-results/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Large datasets
+*.tar.gz
+*.zip
+large_files/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Fine-tuning specific
+lora_adapters/
+peft_cache/
+deepspeed_logs/
+
+# Model serving
+inference_cache/
+model_server_logs/
+
+# Documentation build
+docs/_build/
