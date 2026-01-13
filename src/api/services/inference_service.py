@@ -17,6 +17,7 @@ from transformers import (
 )
 from peft import PeftModel
 import logging
+import os
 
 from src.api.models import (
     ChatResponse, ResponseMetadata, AlternativeResponse,
@@ -88,15 +89,39 @@ class InferenceService:
             device = model_config.get('device', 'cuda' if torch.cuda.is_available() else 'cpu')
             torch_dtype = getattr(torch, model_config.get('torch_dtype', 'float16'))
             
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_path,
-                torch_dtype=torch_dtype,
-                device_map="auto" if device == 'cuda' else None,
-                trust_remote_code=True,
-                load_in_8bit=model_config.get('load_in_8bit', False)
-            )
+            # check if loading LoRA adapters or full model
+            adapter_config_path = os.path.join(model_path, "adapter_config.json")
+            is_lora_model = os.path.exists(adapter_config_path)
             
-            if device == 'cpu':
+            if is_lora_model:
+                # load base model first, then adapters
+                with open(adapter_config_path, 'r') as f:
+                    import json
+                    adapter_config = json.load(f)
+                    base_model_name = adapter_config.get('base_model_name_or_path', 'meta-llama/Llama-2-7b-chat-hf')
+                
+                logger.info(f"loading base model: {base_model_name}")
+                base_model = AutoModelForCausalLM.from_pretrained(
+                    base_model_name,
+                    torch_dtype=torch_dtype,
+                    device_map="auto" if device == 'cuda' else None,
+                    trust_remote_code=True,
+                    load_in_8bit=model_config.get('load_in_8bit', False)
+                )
+                
+                logger.info(f"loading lora adapters from {model_path}")
+                self.model = PeftModel.from_pretrained(base_model, model_path)
+            else:
+                # load full merged model
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    torch_dtype=torch_dtype,
+                    device_map="auto" if device == 'cuda' else None,
+                    trust_remote_code=True,
+                    load_in_8bit=model_config.get('load_in_8bit', False)
+                )
+            
+            if device == 'cpu' and not is_lora_model:
                 self.model = self.model.to(device)
             
             gen_config = self.config.get('generation', {})
