@@ -7,6 +7,7 @@ import time
 import hashlib
 from typing import Any, Optional, Dict
 from threading import Lock
+from pathlib import Path
 import pickle
 
 
@@ -255,7 +256,3 @@ class DiskCache(ResponseCache):
         # Clear disk files
         for cache_file in self.cache_dir.glob("*.pkl"):
             cache_file.unlink()
-
-
-# Import Path here to avoid circular imports
-from pathlib import Path

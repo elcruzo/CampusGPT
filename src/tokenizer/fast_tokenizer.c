@@ -7,14 +7,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-static inline uint32_t hash_string(const char* str, size_t len) {
-    uint32_t hash = 5381;
-    for (size_t i = 0; i < len; i++) {
-        hash = ((hash << 5) + hash) + (unsigned char)str[i];
-    }
-    return hash;
-}
-
 static int compare_vocab_entry(const void* a, const void* b) {
     return strcmp(*(const char**)a, *(const char**)b);
 }
@@ -51,14 +43,15 @@ Tokenizer* tokenizer_load(const char* vocab_file) {
         return NULL;
     }
     
-    memcpy(tok->vocab_data, data, st.st_size);
-    tok->vocab_data[st.st_size] = '\0';
-    tok->vocab_data_size = st.st_size;
+    size_t file_size = (size_t)st.st_size;
+    memcpy(tok->vocab_data, data, file_size);
+    tok->vocab_data[file_size] = '\0';
+    tok->vocab_data_size = file_size;
     munmap(data, st.st_size);
 
     // count lines
     size_t line_count = 0;
-    for (size_t i = 0; i < st.st_size; i++) {
+    for (size_t i = 0; i < file_size; i++) {
         if (tok->vocab_data[i] == '\n') line_count++;
     }
 
@@ -75,7 +68,7 @@ Tokenizer* tokenizer_load(const char* vocab_file) {
     // parse vocab
     size_t idx = 0;
     char* line = tok->vocab_data;
-    for (size_t i = 0; i < st.st_size; i++) {
+    for (size_t i = 0; i < file_size; i++) {
         if (tok->vocab_data[i] == '\n') {
             tok->vocab_data[i] = '\0';
             if (strlen(line) > 0) {

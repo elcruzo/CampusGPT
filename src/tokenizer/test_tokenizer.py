@@ -1,12 +1,15 @@
 import sys
 import os
 
+# add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+
 try:
     import campusgpt_tokenizer
     FAST_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     FAST_AVAILABLE = False
-    print("fast tokenizer not built, skipping tests")
+    print(f"fast tokenizer not built: {e}")
     sys.exit(0)
 
 def test_basic_encode():

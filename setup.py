@@ -1,12 +1,22 @@
 from setuptools import setup, Extension
 import os
 import sys
+import platform
+
+compile_args = ['-O3']
+if sys.platform == 'darwin':
+    # mac - no march=native
+    compile_args.append('-fno-strict-aliasing')
+elif sys.platform == 'linux':
+    compile_args.append('-march=native')
+elif sys.platform == 'win32':
+    compile_args = ['/O2']
 
 tokenizer_module = Extension(
     'campusgpt_tokenizer',
     sources=['src/tokenizer/fast_tokenizer.c', 'src/tokenizer/tokenizer_bindings.c'],
     include_dirs=['src/tokenizer'],
-    extra_compile_args=['-O3', '-march=native'] if sys.platform != 'win32' else ['/O2'],
+    extra_compile_args=compile_args,
 )
 
 extensions = [tokenizer_module]

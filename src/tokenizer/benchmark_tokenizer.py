@@ -1,12 +1,15 @@
 import time
 import sys
+import os
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 try:
     import campusgpt_tokenizer
     FAST_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     FAST_AVAILABLE = False
-    print("fast tokenizer not available")
+    print(f"fast tokenizer not available: {e}")
     sys.exit(1)
 
 try:
