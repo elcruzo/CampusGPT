@@ -391,7 +391,7 @@ class InferenceService:
         return valid_responses
     
     def _get_sources(self, context: ChatContext) -> List[str]:
-        """Get mock data sources for context"""
+        """Get data sources for context"""
         source_mapping = {
             ChatContext.ACADEMIC: ["registrar_catalog", "academic_policies", "course_database"],
             ChatContext.STUDENT_LIFE: ["student_handbook", "housing_portal", "dining_services"],

@@ -18,12 +18,18 @@ make
 import campusgpt_quant
 import numpy as np
 
-# quantize weights
 weights = np.random.randn(4096).astype(np.float32)
-quantized = campusgpt_quant.quantize_nf4(weights, block_size=64)
 
-# 8x compression (32-bit to 4-bit)
-print(f"compression: {weights.nbytes / quantized.nbytes:.1f}x")
+# quantize - returns (quantized_data, scales)
+quantized, scales = campusgpt_quant.quantize_nf4(weights, block_size=64)
+
+# dequantize back to float
+recovered = campusgpt_quant.dequantize_nf4(quantized, scales, len(weights), block_size=64)
+
+# check error
+mse = np.mean((weights - recovered) ** 2)
+print(f"mse: {mse:.6f}")
+print(f"compression: {weights.nbytes / (quantized.nbytes + scales.nbytes):.1f}x")
 ```
 
 ## implementation
@@ -31,8 +37,9 @@ print(f"compression: {weights.nbytes / quantized.nbytes:.1f}x")
 - block-wise quantization (default block_size=64)
 - absmax scaling per block
 - NF4 lookup table for quantization
-- optimized CUDA kernels with coalesced memory access
+- race-free CUDA kernels (one thread per output byte)
 - 2 values packed per byte
+- proper error handling with CUDA_CHECK macros
 
 ## algorithm
 
@@ -43,20 +50,18 @@ NF4 maps floats to 4-bit using a non-linear lookup table optimized for normal di
 3. find closest entry in NF4 table
 4. pack 2 4-bit values per byte
 
-## benchmark
+## tests
 
-on T4 GPU, quantizing 65k floats:
-- custom kernels: ~0.05ms
-- bitsandbytes: ~0.08ms
-- speedup: ~1.6x
+```bash
+python test_quantization.py
+```
 
-actual performance depends on tensor size and block size. bigger blocks = faster but less accurate.
+tests roundtrip accuracy, compression ratio, different sizes/block sizes, edge cases, and determinism.
 
 ## limitations
 
 - requires CUDA gpu
-- simplified NF4 (basic implementation)
-- no double quantization yet
-- fixed block size
+- no double quantization
+- fixed block size per call
 
-good for understanding quantization internals. production code should use bitsandbytes.
+for production use cases, consider bitsandbytes which has more optimizations.
