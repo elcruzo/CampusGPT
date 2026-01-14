@@ -62,11 +62,7 @@ checkpoints/
 model_cache/
 
 # Training data (potentially sensitive)
-data/raw/
-data/processed/
 data/private/
-*.jsonl
-*.json
 *.csv
 *.parquet
 

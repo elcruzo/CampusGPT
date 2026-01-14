@@ -2,7 +2,6 @@
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 
-// NF4 lookup table (normalized float 4-bit)
 __constant__ float NF4_TABLE[16] = {
     -1.0f, -0.6961928009986877f, -0.5250730514526367f, -0.39491748809814453f,
     -0.28444138169288635f, -0.18477343022823334f, -0.09105003625154495f, 0.0f,
@@ -11,10 +10,9 @@ __constant__ float NF4_TABLE[16] = {
 };
 
 __device__ inline uint8_t quantize_value(float val, float scale) {
-    float normalized = val / (scale + 1e-8f);
+    float normalized = (scale > 1e-8f) ? val / scale : 0.0f;
     normalized = fmaxf(-1.0f, fminf(1.0f, normalized));
     
-    // find closest value in table
     uint8_t best_idx = 0;
     float best_diff = fabsf(normalized - NF4_TABLE[0]);
     
@@ -34,43 +32,43 @@ __device__ inline float dequantize_value(uint8_t idx, float scale) {
     return NF4_TABLE[idx & 0xF] * scale;
 }
 
-__global__ void quantize_nf4_kernel(const float* input, uint8_t* output, 
-                                     float* scales, size_t n, int block_size) {
+__global__ void compute_scales_kernel(const float* input, float* scales, 
+                                       size_t n, int block_size) {
     int block_idx = blockIdx.x;
-    int tid = threadIdx.x;
-    int global_idx = block_idx * block_size + tid;
+    int start = block_idx * block_size;
+    int end = min(start + block_size, (int)n);
     
-    if (global_idx >= n) return;
+    if (start >= n) return;
     
-    // compute block scale (absmax)
-    __shared__ float block_max;
-    
-    if (tid == 0) {
-        float local_max = 0.0f;
-        for (int i = 0; i < block_size && (block_idx * block_size + i) < n; i++) {
-            local_max = fmaxf(local_max, fabsf(input[block_idx * block_size + i]));
-        }
-        block_max = local_max;
-        scales[block_idx] = local_max;
+    float local_max = 0.0f;
+    for (int i = start; i < end; i++) {
+        local_max = fmaxf(local_max, fabsf(input[i]));
     }
-    __syncthreads();
+    scales[block_idx] = local_max;
+}
+
+__global__ void quantize_nf4_kernel(const float* input, uint8_t* output, 
+                                     const float* scales, size_t n, int block_size) {
+    int byte_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t output_bytes = (n + 1) / 2;
     
-    // quantize values
-    if (global_idx < n) {
-        uint8_t q = quantize_value(input[global_idx], block_max);
-        
-        // pack 2 values per byte
-        int byte_idx = global_idx / 2;
-        int nibble = global_idx % 2;
-        
-        if (nibble == 0) {
-            atomicAnd(&output[byte_idx], 0xF0);  // clear lower nibble
-            atomicOr(&output[byte_idx], q);       // set lower nibble
-        } else {
-            atomicAnd(&output[byte_idx], 0x0F);  // clear upper nibble
-            atomicOr(&output[byte_idx], q << 4); // set upper nibble
-        }
+    if (byte_idx >= output_bytes) return;
+    
+    int idx0 = byte_idx * 2;
+    int idx1 = byte_idx * 2 + 1;
+    
+    int block_idx0 = idx0 / block_size;
+    float scale0 = scales[block_idx0];
+    uint8_t q0 = (idx0 < n) ? quantize_value(input[idx0], scale0) : 0;
+    
+    uint8_t q1 = 0;
+    if (idx1 < n) {
+        int block_idx1 = idx1 / block_size;
+        float scale1 = scales[block_idx1];
+        q1 = quantize_value(input[idx1], scale1);
     }
+    
+    output[byte_idx] = q0 | (q1 << 4);
 }
 
 __global__ void dequantize_nf4_kernel(const uint8_t* input, const float* scales,
@@ -82,7 +80,6 @@ __global__ void dequantize_nf4_kernel(const uint8_t* input, const float* scales,
     int block_idx = global_idx / block_size;
     float scale = scales[block_idx];
     
-    // unpack 2 values per byte
     int byte_idx = global_idx / 2;
     int nibble = global_idx % 2;
     
@@ -94,22 +91,27 @@ __global__ void dequantize_nf4_kernel(const uint8_t* input, const float* scales,
 
 void quantize_nf4_cuda(const float* input, uint8_t* output, float* scales,
                        size_t n, int block_size) {
-    int num_blocks = (n + block_size - 1) / block_size;
-    int threads = min(block_size, 256);
+    if (n == 0) return;
     
-    // zero output
+    int num_quant_blocks = (n + block_size - 1) / block_size;
+    compute_scales_kernel<<<num_quant_blocks, 1>>>(input, scales, n, block_size);
+    cudaDeviceSynchronize();
+    
     size_t output_bytes = (n + 1) / 2;
-    cudaMemset(output, 0, output_bytes);
+    int threads = 256;
+    int grid = (output_bytes + threads - 1) / threads;
     
-    quantize_nf4_kernel<<<num_blocks, threads>>>(input, output, scales, n, block_size);
+    quantize_nf4_kernel<<<grid, threads>>>(input, output, scales, n, block_size);
     cudaDeviceSynchronize();
 }
 
 void dequantize_nf4_cuda(const uint8_t* input, const float* scales, float* output,
                          size_t n, int block_size) {
-    int num_blocks = (n + 255) / 256;
-    int threads = 256;
+    if (n == 0) return;
     
-    dequantize_nf4_kernel<<<num_blocks, threads>>>(input, scales, output, n, block_size);
+    int threads = 256;
+    int grid = (n + threads - 1) / threads;
+    
+    dequantize_nf4_kernel<<<grid, threads>>>(input, scales, output, n, block_size);
     cudaDeviceSynchronize();
 }
